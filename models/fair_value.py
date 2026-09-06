@@ -6,7 +6,7 @@ strike at expiry, given spot price, volatility, time to expiry, and risk-free ra
 
 import math
 from datetime import datetime
-
+from data.deribit_client import get_tradingview_chart_data, get_option_chain 
 
 def normal_cdf(x: float) -> float:
     normal_function = (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
@@ -44,6 +44,7 @@ def inverse_normal_cdf(p: float) -> float:
         numerator = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
         denominator = ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
         return -(numerator / denominator)
+
 
 def probability_above_strike(
     spot: float,

@@ -43,16 +43,6 @@ def get_option_chain(currency: str = "BTC") -> list[dict]:
     return response.json()['result']
 
 def get_tradingview_chart_data(instrument_name: str, start_timestamp: int, end_timestamp: int, resolution: str = "60") -> dict:
-    """
-    Get historical OHLCV candle data for an instrument (index, future, or option)
-    from Deribit's TradingView-compatible endpoint.
-
-    Endpoint: public/get_tradingview_chart_data
-    Params: instrument_name, start_timestamp, end_timestamp (ms), resolution
-
-    The raw response is printed before accessing its result so the endpoint
-    shape can be inspected empirically.
-    """
     params = {
         "instrument_name": instrument_name,
         "start_timestamp": start_timestamp,
