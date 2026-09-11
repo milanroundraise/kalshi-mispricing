@@ -101,7 +101,6 @@ def get_nearest_atm_option(option_chain: list[dict], spot_price: float, target_e
     else:
         raise ValueError(f"Neither option has valid quotes at strike {target_strike}")
 
-    print(f"Chosen option: {chosen_option}")
 
     return chosen_option
 

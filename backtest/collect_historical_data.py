@@ -6,7 +6,7 @@ for calibration/backtesting against the fair_value pricing model.
 from datetime import datetime, timedelta, timezone
 from data.kalshi_client import get_candlesticks, get_markets
 from data.deribit_client import get_index_price, get_dvol, get_tradingview_chart_data
-from models.fair_value import probability_above_strike
+from models.fair_value import implied_volatility, probability_above_strike
 import csv
 
 if __name__ == "__main__":
@@ -62,7 +62,7 @@ if __name__ == "__main__":
                 end_ts=checkpoint_ts_seconds + window_seconds,
                 period_interval=1,
             )
-            print(candlesticks)
+           
             nearest_candle = min(candlesticks, key=lambda c: abs(c['end_period_ts'] - checkpoint_ts_seconds))
             print(f" nearest candle: {nearest_candle['end_period_ts']}, yes_bid={nearest_candle['yes_bid']['close_dollars']}, yes_ask={nearest_candle['yes_ask']['close_dollars']}")
             dvol_data = get_dvol(
@@ -70,7 +70,7 @@ if __name__ == "__main__":
                 start_timestamp=(checkpoint_ts_seconds - 300) * 1000,
                 end_timestamp=(checkpoint_ts_seconds + 300) *1000,
                 resolution="60",)
-            print(f" dvol: {dvol_data}")
+            
             nearest_dvol_row = min(dvol_data, key=lambda row: abs(row[0] - (checkpoint_ts_seconds * 1000)))
             implied_dvol_percent = nearest_dvol_row[4]
             converted_dvol = implied_dvol_percent / 100
@@ -91,6 +91,28 @@ if __name__ == "__main__":
                 time_to_expiry_seconds=time_to_expiry_seconds,
                 volatility=converted_dvol,)
             print(f"model probability: {model_probability}")
+            kalshi_yes_bid = float(nearest_candle['yes_bid']['close_dollars'])
+            kalshi_yes_ask = float(nearest_candle['yes_ask']['close_dollars'])
+            kalshi_midpoint_probability = (kalshi_yes_bid + kalshi_yes_ask) / 2
+            print(f"kalshi midpoint probability: {kalshi_midpoint_probability}")
+            try:
+                kalshi_implied_vol = implied_volatility(
+                    spot=checkpoint_spot_price,
+                    strike=nearest_atm_market['floor_strike'],
+                    time_to_expiry_seconds=time_to_expiry_seconds,
+                    market_probability=kalshi_midpoint_probability
+                )
+            except ValueError as e:
+                print(f"cant compute implied vol for this checkpoint {e}")
+                kalshi_implied_vol = None
+            if kalshi_implied_vol is not None:
+                check_probability = probability_above_strike(
+                    spot=checkpoint_spot_price,
+                    strike=nearest_atm_market['floor_strike'],
+                    time_to_expiry_seconds=time_to_expiry_seconds,
+                    volatility=kalshi_implied_vol,
+                )
+                print(f" round-trip check: kalshi_implied_vol={kalshi_implied_vol} -> probability={check_probability} (should match {kalshi_midpoint_probability})")
             result_row = {
                 "event_ticker": event_ticker,
                 "market_ticker": nearest_atm_market['ticker'],
@@ -100,10 +122,12 @@ if __name__ == "__main__":
                 "kalshi_yes_bid": float(nearest_candle['yes_bid']['close_dollars']),
                 "kalshi_yes_ask": float(nearest_candle['yes_ask']['close_dollars']),
                 "actual_result": nearest_atm_market['result'],
+                "kalshi_implied_vol": kalshi_implied_vol,
+                "converted_dvol": converted_dvol,
             }
             all_results.append(result_row)
             print(f"Total results collected: {len(all_results)}")
-            print(all_results[0])
+          
 
     with open ("backtest_results.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=all_results[0].keys())
