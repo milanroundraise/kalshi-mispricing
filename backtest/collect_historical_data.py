@@ -33,7 +33,7 @@ if __name__ == "__main__":
     checkpoint_offsets_seconds = [60 * 60, 30 * 60, 10 * 60, 2 * 60]
     all_results = []
 
-    for event_ticker, markets_in_hour in list(grouped_by_hour.items())[:2]:
+    for event_ticker, markets_in_hour in grouped_by_hour.items():
         close_dt = datetime.fromisoformat(markets_in_hour[0]['close_time'])
         close_ts_ms = int(close_dt.timestamp() * 1000)
         chart_data = get_tradingview_chart_data(
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         close_ts_seconds = int(close_dt.timestamp())
         for offset in checkpoint_offsets_seconds:
             checkpoint_ts_seconds = close_ts_seconds - offset #migos
-            print(f" checkpoint: {offset}s before close -> {checkpoint_ts_seconds}")
+            
             window_seconds = 5 * 60
             candlesticks = get_candlesticks(
                 series_ticker="KXBTCD",
@@ -62,19 +62,27 @@ if __name__ == "__main__":
                 end_ts=checkpoint_ts_seconds + window_seconds,
                 period_interval=1,
             )
-           
+
+
+            if not candlesticks:
+                print(f"No candlesticks found for market {nearest_atm_market['ticker']} around checkpoint {checkpoint_ts_seconds}")
+                continue           
             nearest_candle = min(candlesticks, key=lambda c: abs(c['end_period_ts'] - checkpoint_ts_seconds))
-            print(f" nearest candle: {nearest_candle['end_period_ts']}, yes_bid={nearest_candle['yes_bid']['close_dollars']}, yes_ask={nearest_candle['yes_ask']['close_dollars']}")
+           
             dvol_data = get_dvol(
                 currency="BTC",
                 start_timestamp=(checkpoint_ts_seconds - 300) * 1000,
                 end_timestamp=(checkpoint_ts_seconds + 300) *1000,
                 resolution="60",)
+
+            if not dvol_data:
+                print(f"No dvol data found for market {nearest_atm_market['ticker']} around checkpoint {checkpoint_ts_seconds}")
+                continue
             
             nearest_dvol_row = min(dvol_data, key=lambda row: abs(row[0] - (checkpoint_ts_seconds * 1000)))
             implied_dvol_percent = nearest_dvol_row[4]
             converted_dvol = implied_dvol_percent / 100
-            print(f" nearest dvol: {nearest_dvol_row}, implied_dvol_percent: {implied_dvol_percent}, converted_dvol: {converted_dvol}")
+          
             checkpoint_ts_ms = checkpoint_ts_seconds * 1000
             spot_chart_data = get_tradingview_chart_data(
                 instrument_name="BTC-PERPETUAL",
@@ -90,11 +98,11 @@ if __name__ == "__main__":
                 strike=nearest_atm_market['floor_strike'],
                 time_to_expiry_seconds=time_to_expiry_seconds,
                 volatility=converted_dvol,)
-            print(f"model probability: {model_probability}")
+            
             kalshi_yes_bid = float(nearest_candle['yes_bid']['close_dollars'])
             kalshi_yes_ask = float(nearest_candle['yes_ask']['close_dollars'])
             kalshi_midpoint_probability = (kalshi_yes_bid + kalshi_yes_ask) / 2
-            print(f"kalshi midpoint probability: {kalshi_midpoint_probability}")
+            
             try:
                 kalshi_implied_vol = implied_volatility(
                     spot=checkpoint_spot_price,
@@ -126,7 +134,7 @@ if __name__ == "__main__":
                 "converted_dvol": converted_dvol,
             }
             all_results.append(result_row)
-            print(f"Total results collected: {len(all_results)}")
+            print(f" checkpoint {offset}s: model={model_probability:.3f}, kalshi_mid={kalshi_midpoint_probability:.3f}, actual={nearest_atm_market['result']}")
           
 
     with open ("backtest_results.csv", "w", newline="") as f:
@@ -134,4 +142,4 @@ if __name__ == "__main__":
         writer.writeheader()
         writer.writerows(all_results)
 
-    print(f"saved {len(all_results)} results to backtest_results.csv")
+    print("Done collecting historical data, results written to backtest_results.csv")

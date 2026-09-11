@@ -122,6 +122,8 @@ def implied_volatility(
     if discriminant < 0:
         raise ValueError("Discriminant is negative, cannot compute implied volatility")
     sigma = (-B + math.sqrt(discriminant)) / (2*A)
+    if sigma <= 0:
+        raise ValueError("Computed implied volatility is non-positive")
     return sigma
 
 if __name__ == "__main__":
