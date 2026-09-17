@@ -85,6 +85,8 @@ if __name__ == "__main__":
     simulated_trades = []
     for row in cleaned_rows:
         kalshi_midpoint = (row['kalshi_yes_bid'] + row['kalshi_yes_ask']) / 2
+        if kalshi_midpoint < 0.05 or kalshi_midpoint > 0.95:
+            continue
         edge = row['model_probability'] - kalshi_midpoint
         if abs(edge) < threshold:
             continue
