@@ -97,6 +97,7 @@ if __name__ == "__main__":
             direction = "NO"
             entry_price = 1 - row['kalshi_yes_bid']
         size = base_size * (abs(edge) / threshold)
+        size = min(size, 4)
         if (direction == "YES" and row['actual_result_binary'] == 1) or (direction == "NO" and row['actual_result_binary'] == 0):
             payout = 1
         else:
